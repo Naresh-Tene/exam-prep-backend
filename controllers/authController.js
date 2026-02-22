@@ -7,10 +7,15 @@ const jwt = require("jsonwebtoken");
 // ==========================
 const registerUser = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
 
-    // Check if user exists
-    const userExists = await User.findOne({ username });
+    // Validate fields
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "Please fill all fields" });
+    }
+
+    // Check if email already exists
+    const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
@@ -18,8 +23,10 @@ const registerUser = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
+    // Create user
+    await User.create({
       username,
+      email,
       password: hashedPassword,
     });
 
@@ -33,31 +40,39 @@ const registerUser = async (req, res) => {
 };
 
 // ==========================
-// LOGIN USER (JWT)
+// LOGIN USER
 // ==========================
 const loginUser = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
-    const user = await User.findOne({ username });
+    // Check if user exists
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ message: "User not found" });
     }
 
+    // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+    // Generate token
     const token = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    res.json({
+    res.status(200).json({
       message: "Login successful",
       token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+      },
     });
 
   } catch (error) {
